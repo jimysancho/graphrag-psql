@@ -1,4 +1,18 @@
-.venv/
-.git/
-.env
-__pycache__
+version: '0.0'
+services:
+  lightrag-sql-db:
+    container_name: db
+    build: 
+      context: .
+      dockerfile: Dockerfile.db
+    ports:
+      - "5434:5432"
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - postgres:/var/lib/postgresql/data/
+volumes:
+  postgres:

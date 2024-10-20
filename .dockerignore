@@ -1,0 +1,66 @@
+# Ignore Python cache files
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pdb
+*.egg
+*.egg-info/
+*.dist-info/
+
+# Ignore environment files
+.env
+*.env
+.env.*
+
+# Ignore virtual environment directories
+venv/
+.venv/
+
+# Ignore logs and databases
+*.log
+*.sqlite3
+
+# Ignore Docker-related files
+Dockerfile
+docker-compose.yml
+docker-compose.*.yml
+
+# Ignore test and coverage files
+tests/
+.coverage
+*.cover
+*.py,cover
+htmlcov/
+coverage.xml
+*.cov
+
+# Ignore IDE and editor configuration
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+*.bak
+
+# Ignore build files
+build/
+dist/
+*.spec
+*.dll
+*.so
+*.dylib
+
+# Ignore node_modules (if using frontend with FastAPI)
+node_modules/
+
+# Ignore compiled translations
+*.mo
+
+# Ignore git files
+.git/
+.gitignore
+
+# Ignore temporary files
+tmp/
+*.tmp

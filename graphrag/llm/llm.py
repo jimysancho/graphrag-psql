@@ -3,7 +3,7 @@ from graphrag.llm.prompt import (BAD_PYTHON_DICTIONARY_PARSING,
                                  ENTITY_EXTRACTION_PROMPT,
                                  CONTINUE_EXTRACTING_ENTITIES)
 
-from typing import Dict, Any
+from typing import Dict, Any, List
 import os
 
 
@@ -48,3 +48,9 @@ async def extract_entities_completion(chunk: str, history: str | None=None) -> D
             except SyntaxError as e:
                 continue
     return {}
+
+
+async def create_embeddings(texts: List[str]) -> List[List[float]]:
+    client = AsyncClient(api_key=os.environ["OPENAI_API_KEY"])
+    results = await client.embeddings.create(input=texts, model="text-embedding-3-small")
+    return [result.embedding for result in results.data]

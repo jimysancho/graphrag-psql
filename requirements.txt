@@ -1,0 +1,9 @@
+openai==1.37.1
+SQLAlchemy==2.0.32
+psycopg2-binary==2.9.9
+anthropic
+passlib
+pgvector
+tiktoken
+unidecode
+fuzzywuzzy

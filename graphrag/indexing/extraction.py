@@ -5,13 +5,17 @@ from graphrag.indexing.types import (
     HighLevelKeywords
 )
 
-from graphrag.llm.llm import extract_entities_completion
+from graphrag.llm.llm import extract_entities_completion, create_embeddings
+from graphrag.database.base import get_db
+from graphrag.database.models import Entity, Relationship, Chunk
+from graphrag.indexing.utils import calculate_hash
 
 from typing import List, Tuple, Dict, Any
 from fuzzywuzzy import fuzz
 
 import uuid
 import asyncio
+import networkx as nx 
 
 
 def _merge_entities(entities: List[EntityModel], threshold: int=75) -> Tuple[List[EntityModel], Dict[str, List[str]]]:
@@ -70,8 +74,9 @@ def _merge_entities(entities: List[EntityModel], threshold: int=75) -> Tuple[Lis
     return updated_entities, kept_vs_merged
 
 
-def _merge_relationships(relationships: List[RelationshipModel], 
-                         kept_vs_merged_entities: Dict[str, List[str]]) -> List[RelationshipModel]:
+def _merge_relationships(
+    relationships: List[RelationshipModel], kept_vs_merged_entities: Dict[str, List[str]]
+) -> List[RelationshipModel]:
 
     for relationship in relationships:
         source, target = relationship.source_entity, relationship.target_entity
@@ -147,3 +152,84 @@ async def extract_entities(chunks: List[str]) -> Any:
     relationships = _merge_relationships(relationships=relationships, kept_vs_merged_entities=kept_vs_merged)
     
     return entities, relationships, kept_vs_merged, chunks
+
+
+async def upsert_data_and_create_graph(
+    entities: List[EntityModel], relationships: List[RelationshipModel], chunks: List[ChunkModel]
+) -> None:
+    
+    chunk_embeddings_task = create_embeddings(texts=[chunk.text for chunk in chunks])
+    entities_embeddings_task = create_embeddings(texts=[entity.entity_name for entity in entities])
+    relationship_embeddings_task = create_embeddings(texts=[
+        relationship.source_entity + " " + relationship.target_entity + " " + relationship.relationship_description
+        for relationship in relationships
+    ])
+    
+    chunk_embeddings, entities_embeddings, relationship_embeddings = await asyncio.gather(*[
+        chunk_embeddings_task, entities_embeddings_task, relationship_embeddings_task
+    ])
+    
+    with get_db() as db:
+        
+        for index, chunk in enumerate(chunks):
+            
+            hash = "chunk-" + calculate_hash(text=chunk.text)
+            if db.get(Chunk.hash, hash) is not None: 
+                continue
+        
+            db.add(
+                Chunk(
+                    chunk_id=chunk.id,
+                    text=chunk.text,
+                    embedding=chunk_embeddings[index],
+                    hash=hash
+                )
+            )
+
+        db.commit()
+
+        for index, entity in enumerate(entities):
+            hash = "ent-" + calculate_hash(text=entity.entity_name)
+            if db.get(Entity.hash, hash) is not None:
+                continue
+
+            entity_db = Entity(
+                hash=hash,
+                entity_name=entity.entity_name,
+                description=entity.entity_description,
+                chunk_id=entity.get_chunk_id,
+                entity_embedding=entities_embeddings[index]
+            )
+
+            db.add(entity_db)
+
+        db.commit()
+        
+        for index, relationship in enumerate(relationships):
+            
+            hash="rel-" + calculate_hash(text=relationship.relationship_description)
+            if db.get(Relationship.hash, hash) is not None:
+                continue
+
+            source_id = db.get(Entity.entity_name, relationship.source_entity)
+            target_id = db.get(Entity.entity_name, relationship.target_entity)
+            
+            if source_id is None:
+                print(f"Source: {relationship.source_entity} was not found in the database")
+                continue
+            if target_id is None:
+                print(f"Target: {relationship.target_entity} was not found in the database")
+            
+            relationship_db = Relationship(
+                hash=hash,
+                description=relationship.relationship_description,
+                relationship_embedding=relationship_embeddings[index],
+                source_id=source_id,
+                target_id=target_id,
+                chunk_id=relationship.get_chunk_id,
+                keywords=relationship.relationship_keywords,
+                weight=relationship.relationship_strength
+            )
+            
+            db.add(relationship_db)
+        db.commit()

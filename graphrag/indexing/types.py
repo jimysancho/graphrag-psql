@@ -9,6 +9,7 @@ class EntityModel(BaseModel):
     entity_type: str
     entity_description: str
     chunk_id: Set[str]
+    entity_text: str | None = None
 
     @property
     def get_chunk_id(self) -> Any:
@@ -17,8 +18,9 @@ class EntityModel(BaseModel):
     
     @model_validator(mode='after')
     def remove_tildes(self):
-        self.entity_name = unidecode(self.entity_name).lower()
-        self.entity_type = unidecode(self.entity_type).lower()
+        self.entity_name = unidecode(self.entity_name).lower().strip()
+        self.entity_type = unidecode(self.entity_type).lower().strip()
+        self.entity_text = f"{self.entity_name} it's of type: {self.entity_type}: {self.entity_description}"
         return self
     
     def update_chunk_ids(self, chunk_id: str | Set[str]):
@@ -33,17 +35,16 @@ class RelationshipModel(BaseModel):
     relationship_strength: float
     chunk_id: Set[str]
     
-    @model_validator(mode='after')
-    def string_to_list(self):
-        self.relationship_keywords = self.relationship_keywords.split(", ")
-        return self
-    
+    relationship_text: str | None = None
+        
     @model_validator(mode='after')
     def remove_tildes(self):
-        self.source_entity = unidecode(self.source_entity).lower()
-        self.target_entity = unidecode(self.target_entity).lower()
+        self.source_entity = unidecode(self.source_entity).lower().strip()
+        self.target_entity = unidecode(self.target_entity).lower().strip()
+        self.relationship_keywords = self.relationship_keywords.split(", ")
+        self.relationship_text = f"{self.source_entity} is related to {self.target_entity} because of: {self.relationship_description}"
         return self
-    
+
     def update_chunk_ids(self, chunk_id: str | Set[str]):
         self.chunk_id.add(chunk_id) if isinstance(chunk_id, str) else self.chunk_id.union(chunk_id)
         

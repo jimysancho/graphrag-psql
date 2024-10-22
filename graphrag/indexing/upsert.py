@@ -68,6 +68,7 @@ async def upsert_data_and_create_graph(
         entity_db = Entity(
             hash=hash,
             entity_name=entity.entity_name,
+            entity_type=entity.entity_type,
             description=entity.entity_description,
             chunk_id=uuid.UUID(entity.get_chunk_id),
             entity_embedding=entities_embeddings[index]

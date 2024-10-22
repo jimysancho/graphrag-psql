@@ -15,7 +15,9 @@ from fuzzywuzzy import fuzz
 
 import uuid
 import asyncio
-import networkx as nx 
+import networkx as nx
+
+import uuid
 
 
 def _merge_entities(entities: List[EntityModel], threshold: int=75) -> Tuple[List[EntityModel], Dict[str, List[str]]]:
@@ -131,10 +133,10 @@ async def _extract_graph_information_from_chunk(chunk: str, gleaning: int=1) -> 
     return entities_models, relationships_models, chunk_model
 
 
-async def extract_entities(chunks: List[str]) -> Any:
+async def extract_entities(chunks: List[str], gleaning: int=1) -> Any:
 
     results = await asyncio.gather(*[
-        _extract_graph_information_from_chunk(chunk=chunk) for chunk in chunks
+        _extract_graph_information_from_chunk(chunk=chunk, gleaning=gleaning) for chunk in chunks
     ])
     
     if results is None:
@@ -143,6 +145,8 @@ async def extract_entities(chunks: List[str]) -> Any:
     entities, relationships, chunks = [], [], []
         
     for result in results:
+        if result is None:
+            continue
         entities_n, relationships_n, chunk = result
         entities.extend(entities_n)
         relationships.extend(relationships_n)
@@ -156,7 +160,7 @@ async def extract_entities(chunks: List[str]) -> Any:
 
 async def upsert_data_and_create_graph(
     entities: List[EntityModel], relationships: List[RelationshipModel], chunks: List[ChunkModel]
-) -> None:
+) -> nx.Graph:
     
     chunk_embeddings_task = create_embeddings(texts=[chunk.text for chunk in chunks])
     entities_embeddings_task = create_embeddings(texts=[entity.entity_name for entity in entities])
@@ -169,67 +173,92 @@ async def upsert_data_and_create_graph(
         chunk_embeddings_task, entities_embeddings_task, relationship_embeddings_task
     ])
     
-    with get_db() as db:
+    db = next(get_db())
+    
+    for index, chunk in enumerate(chunks):
         
-        for index, chunk in enumerate(chunks):
-            
-            hash = "chunk-" + calculate_hash(text=chunk.text)
-            if db.get(Chunk.hash, hash) is not None: 
-                continue
+        hash = "chunk-" + calculate_hash(text=chunk.text)
+        if db.query(Chunk).filter(Chunk.hash == hash).all(): 
+            continue
+    
+        db.add(
+            Chunk(
+                chunk_id=uuid.UUID(chunk.id),
+                text=chunk.text,
+                embedding=chunk_embeddings[index],
+                hash=hash
+            )
+        )
+
+    db.commit()
+
+    for index, entity in enumerate(entities):
+        hash = "ent-" + calculate_hash(text=entity.entity_name)
+        if db.query(Entity).filter(Entity.hash == hash).all(): 
+            continue
+
+        entity_db = Entity(
+            hash=hash,
+            entity_name=entity.entity_name,
+            description=entity.entity_description,
+            chunk_id=uuid.UUID(entity.get_chunk_id),
+            entity_embedding=entities_embeddings[index]
+        )
+
+        db.add(entity_db)
+        db.flush()
+
+    db.commit()
+    
+    for index, relationship in enumerate(relationships):
         
-            db.add(
-                Chunk(
-                    chunk_id=chunk.id,
-                    text=chunk.text,
-                    embedding=chunk_embeddings[index],
-                    hash=hash
-                )
-            )
+        hash = "rel-" + calculate_hash(text=relationship.relationship_description)
+        if db.query(Relationship).filter(Relationship.hash == hash).all(): 
+            continue
 
-        db.commit()
-
-        for index, entity in enumerate(entities):
-            hash = "ent-" + calculate_hash(text=entity.entity_name)
-            if db.get(Entity.hash, hash) is not None:
-                continue
-
-            entity_db = Entity(
-                hash=hash,
-                entity_name=entity.entity_name,
-                description=entity.entity_description,
-                chunk_id=entity.get_chunk_id,
-                entity_embedding=entities_embeddings[index]
-            )
-
-            db.add(entity_db)
-
-        db.commit()
+        source_id = db.query(Entity).filter(Entity.entity_name == relationship.source_entity).first()
+        target_id = db.query(Entity).filter(Entity.entity_name == relationship.target_entity).first()
         
-        for index, relationship in enumerate(relationships):
-            
-            hash="rel-" + calculate_hash(text=relationship.relationship_description)
-            if db.get(Relationship.hash, hash) is not None:
-                continue
+        if source_id is None:
+            print(f"Source: {relationship.source_entity} was not found in the database")
+            continue
+        if target_id is None:
+            print(f"Target: {relationship.target_entity} was not found in the database")
+            continue
+        source_id = source_id.entity_id
+        target_id = target_id.entity_id
+        
+        relationship_db = Relationship(
+            hash=hash,
+            description=relationship.relationship_description,
+            relationship_embedding=relationship_embeddings[index],
+            source_id=source_id,
+            target_id=target_id,
+            chunk_id=uuid.UUID(relationship.get_chunk_id),
+            keywords=relationship.relationship_keywords,
+            weight=relationship.relationship_strength
+        )
+        
+        db.add(relationship_db)
+    db.commit()
+    db.close()
 
-            source_id = db.get(Entity.entity_name, relationship.source_entity)
-            target_id = db.get(Entity.entity_name, relationship.target_entity)
-            
-            if source_id is None:
-                print(f"Source: {relationship.source_entity} was not found in the database")
-                continue
-            if target_id is None:
-                print(f"Target: {relationship.target_entity} was not found in the database")
-            
-            relationship_db = Relationship(
-                hash=hash,
-                description=relationship.relationship_description,
-                relationship_embedding=relationship_embeddings[index],
-                source_id=source_id,
-                target_id=target_id,
-                chunk_id=relationship.get_chunk_id,
-                keywords=relationship.relationship_keywords,
-                weight=relationship.relationship_strength
-            )
-            
-            db.add(relationship_db)
-        db.commit()
+    print("Database created and updated")
+    graph = nx.Graph()
+    
+    for entity in entities:
+        entity.chunk_id = ", ".join(list(entity.chunk_id))
+        graph.add_node(
+            entity.entity_name, **entity.model_dump()
+        )
+    
+    for relationship in relationships:
+        relationship.relationship_keywords = ", ".join(list(relationship.relationship_keywords))
+        relationship.chunk_id = ", ".join(list(relationship.chunk_id))
+        graph.add_edge(
+            relationship.source_entity, relationship.target_entity, **relationship.model_dump()
+        )
+    
+    print(f"Graph created: {len(graph.nodes())} nodes and {len(graph.edges())} edges")
+    nx.write_graphml(graph, "./graph.graphml")
+    return graph

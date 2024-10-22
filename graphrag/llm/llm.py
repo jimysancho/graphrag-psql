@@ -13,17 +13,17 @@ RETRIES = 3
 async def extract_entities_completion(chunk: str, entity_types: List[str], history: str | None=None) -> Dict[str, Any] | None:
 
     client = AsyncClient(api_key=os.environ['OPENAI_API_KEY'])
-    entity_types = ", ".join(entity_types)
+    entity_types_string = ", ".join(entity_types)
     for _ in range(RETRIES):
         if history is None:
             response = await client.chat.completions.create(
                 messages=[
-                    {"role": "system", "content": ENTITY_EXTRACTION_PROMPT.replace("{entity_types}", entity_types).replace("{text}", chunk)}
+                    {"role": "system", "content": ENTITY_EXTRACTION_PROMPT.replace("{entity_types}", entity_types_string).replace("{text}", chunk)}
                     ], 
                 model='gpt-4o-mini'
             )
         else:
-            history = ENTITY_EXTRACTION_PROMPT.replace("{entity_types}", entity_types).replace("{text}", chunk) + history
+            history = ENTITY_EXTRACTION_PROMPT.replace("{entity_types}", entity_types_string).replace("{text}", chunk) + history
             response = await client.chat.completions.create(
                 messages=[{"role": "system", "content": history + CONTINUE_EXTRACTING_ENTITIES}], 
                 model='gpt-4o-mini'

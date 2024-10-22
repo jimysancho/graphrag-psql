@@ -1,5 +1,5 @@
 from pydantic import BaseModel, model_validator
-from typing import Set, Any
+from typing import Set, Any, List
 
 from unidecode import unidecode
 
@@ -8,7 +8,7 @@ class EntityModel(BaseModel):
     entity_name: str
     entity_type: str
     entity_description: str
-    chunk_id: Set[str]
+    chunk_id: Set[str] | str
     entity_text: str | None = None
 
     @property
@@ -31,9 +31,9 @@ class RelationshipModel(BaseModel):
     source_entity: str
     target_entity: str
     relationship_description: str
-    relationship_keywords: str
+    relationship_keywords: str | List[str]
     relationship_strength: float
-    chunk_id: Set[str]
+    chunk_id: Set[str] | str
     
     relationship_text: str | None = None
         
@@ -56,7 +56,7 @@ class RelationshipModel(BaseModel):
 
 class HighLevelKeywords(BaseModel):
     content_keywords: str
-    chunk_id: Set[str]
+    chunk_id: Set[str] | str
     
     @model_validator(mode='after')
     def string_to_list(self):

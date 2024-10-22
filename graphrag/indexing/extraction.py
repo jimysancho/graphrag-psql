@@ -104,15 +104,15 @@ def _merge_relationships(
     return list(merged_relationships.values())
                 
 
-async def _extract_graph_information_from_chunk(chunk: str, gleaning: int=1) -> Tuple[List[EntityModel], List[RelationshipModel], ChunkModel] | None:
+async def _extract_graph_information_from_chunk(chunk: str, entity_types: List[str], gleaning: int=1) -> Tuple[List[EntityModel], List[RelationshipModel], ChunkModel] | None:
     
     chunk_info: Dict[str, Any] = {}
     for _ in range(gleaning):
-        gleaning_chunk_info = await extract_entities_completion(chunk=chunk, history=None)
+        gleaning_chunk_info = await extract_entities_completion(chunk=chunk, history=None, entity_types=entity_types)
         if gleaning_chunk_info is None: continue
     
         more_chunk_info = await extract_entities_completion(
-            chunk=chunk, history=str(chunk_info)
+            chunk=chunk, history=str(chunk_info), entity_types=entity_types
         )
         if more_chunk_info is not None:
             chunk_info.update(more_chunk_info)
@@ -128,16 +128,27 @@ async def _extract_graph_information_from_chunk(chunk: str, gleaning: int=1) -> 
     return entities_models, relationships_models, chunk_model
 
 
-async def extract_entities(chunks: List[str], gleaning: int=1) -> Any:
+async def extract_entities(chunks: List[str], entity_types: List[str], gleaning: int=1) -> Tuple[List[EntityModel], List[RelationshipModel], Dict[str, List[str]], List[ChunkModel]]:
 
-    results = await asyncio.gather(*[
-        _extract_graph_information_from_chunk(chunk=chunk, gleaning=gleaning) for chunk in chunks
-    ])
+    if len(chunks) > 20:
+        results = []
+        for batch in range(0, len(chunks), 20):
+            batch_chunks = chunks[batch: batch + 20]
+            results.extend(
+                await asyncio.gather(*[
+                    _extract_graph_information_from_chunk(chunk=chunk, gleaning=gleaning, entity_types=entity_types) for chunk in batch_chunks
+                ])
+            )
+            await asyncio.sleep(1)
+    else:
+        results = await asyncio.gather(*[
+            _extract_graph_information_from_chunk(chunk=chunk, gleaning=gleaning, entity_types=entity_types) for chunk in chunks
+        ])
     
     if results is None:
         return None
     
-    entities, relationships, chunks = [], [], []
+    entities, relationships, chunks_models = [], [], []
         
     for result in results:
         if result is None:
@@ -145,9 +156,9 @@ async def extract_entities(chunks: List[str], gleaning: int=1) -> Any:
         entities_n, relationships_n, chunk = result
         entities.extend(entities_n)
         relationships.extend(relationships_n)
-        chunks.append(chunk)
+        chunks_models.append(chunk)
         
     entities, kept_vs_merged = _merge_entities(entities=entities)
     relationships = _merge_relationships(relationships=relationships, kept_vs_merged_entities=kept_vs_merged)
     
-    return entities, relationships, kept_vs_merged, chunks
+    return entities, relationships, kept_vs_merged, chunks_models

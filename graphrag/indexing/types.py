@@ -12,9 +12,8 @@ class EntityModel(BaseModel):
 
     @property
     def get_chunk_id(self) -> Any:
-        if len(self.chunk_id) <= 1:
-            return list(self.chunk_id)[0]
-        return self.chunk_id
+        if isinstance(self.chunk_id, str): return self.chunk_id
+        return list(self.chunk_id)[0]
     
     @model_validator(mode='after')
     def remove_tildes(self):
@@ -47,6 +46,11 @@ class RelationshipModel(BaseModel):
     
     def update_chunk_ids(self, chunk_id: str | Set[str]):
         self.chunk_id.add(chunk_id) if isinstance(chunk_id, str) else self.chunk_id.union(chunk_id)
+        
+    @property
+    def get_chunk_id(self) -> str:
+        if isinstance(self.chunk_id, str): return self.chunk_id
+        return list(self.chunk_id)[0]
     
 
 class HighLevelKeywords(BaseModel):

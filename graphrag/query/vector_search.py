@@ -2,13 +2,13 @@ from graphrag.llm.llm import create_embeddings
 from graphrag.database.base import get_db, SQLALCHEMY_DATABASE_URL
 from graphrag.database.models import Entity, Relationship, Chunk
 
-from typing import List, Any
+from typing import List, Tuple
 from pgvector.psycopg2 import register_vector
 
 import psycopg2
 
 
-async def _similarity_search(text: str | List[str], table: str, top_k: int) -> List[Any]:
+async def _similarity_search(text: str | List[str], table: str, top_k: int) -> List[Tuple[Entity | Relationship | Chunk, float]]:
     
     assert table in ("chunk", "entity", "relationship"), f"{table} is not a valid table"
     string_to_table = {

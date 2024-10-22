@@ -7,7 +7,11 @@ from graphrag.indexing.types import (
 
 from graphrag.llm.llm import extract_entities_completion
 
-from typing import List, Tuple, Dict, Any
+from typing import (List, 
+                    Tuple, 
+                    Dict, 
+                    Any, 
+                    Set)
 from fuzzywuzzy import fuzz
 
 import uuid
@@ -15,7 +19,7 @@ import asyncio
 import uuid
 
 
-def _merge_entities(entities: List[EntityModel], threshold: int=75) -> Tuple[List[EntityModel], Dict[str, List[str]]]:
+def _merge_entities(entities: List[EntityModel], threshold: int=75) -> Tuple[List[EntityModel], Dict[str, Set[str]]]:
     
     def find_most_similar(entity: EntityModel, candidates: List[EntityModel], threshold: int) -> List[EntityModel]:
         

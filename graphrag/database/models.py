@@ -9,7 +9,7 @@ from sqlalchemy import (
 )
 
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship, backref
+from sqlalchemy.orm import relationship
 
 from pgvector.sqlalchemy import Vector
 
@@ -21,7 +21,7 @@ class Chunk(Base):
     __tablename__ = "chunk"
     chunk_id = Column(UUID(as_uuid=True), primary_key=True, index=True, default=uuid.uuid4)    
     text = Column(Text, nullable=False)
-    embedding = Column(Vector(1536))
+    chunk_embedding = Column(Vector(1536))
     hash = Column(String, nullable=False, index=True)
     
     chunk_entities = relationship("Entity", back_populates="entity_chunk", cascade='all, delete-orphan')

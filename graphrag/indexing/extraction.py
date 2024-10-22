@@ -40,6 +40,7 @@ def _merge_entities(entities: List[EntityModel], threshold: int=75) -> Tuple[Lis
         entity_key = (entity.entity_name, entity.entity_type, entity.entity_description)
 
         if entity_key in merged_entities:
+            print(f"{entity_key} already exists as an entity")
             continue
     
         if (entity.entity_name, entity.entity_type, entity.entity_description, entity.get_chunk_id) not in modified_entities:
@@ -50,9 +51,9 @@ def _merge_entities(entities: List[EntityModel], threshold: int=75) -> Tuple[Lis
                 merged_entities.add(most_sim_key)
                 modified_entities[(entity.entity_name, entity.entity_type, entity.entity_description, entity.get_chunk_id)].append(most_sim_entity)
                 if most_sim_entity.entity_name not in kept_vs_merged:
-                    kept_vs_merged[most_sim_entity.entity_name] = [entity.entity_name]
+                    kept_vs_merged[most_sim_entity.entity_name] = {entity.entity_name}
                 else:
-                    kept_vs_merged[most_sim_entity.entity_name].append(entity.entity_name)
+                    kept_vs_merged[most_sim_entity.entity_name].add(entity.entity_name)
 
     updated_entities = []
     for entity_info, sim_entities in modified_entities.items():

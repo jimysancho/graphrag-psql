@@ -44,7 +44,7 @@ def split_text(text: str, batch_size: int = 5) -> List[str]:
     return [batch for batch in new_batches if batch.strip()]
 
 
-async def compute_chunks(
+async def _compute_chunks(
     sentences: List[str],
     min_token_size: int,
     max_token_size: int,
@@ -89,7 +89,7 @@ async def compute_chunks(
 
     if not len(next_chunk):
         if count_tokens(first_chunk_text) > max_token_size and sim_th < 1.0:
-            recursive_chunks = await compute_chunks(
+            recursive_chunks = await _compute_chunks(
                 sentences="\n".join(first_chunk),
                 min_token_size=min_token_size,
                 max_token_size=max_token_size,
@@ -154,7 +154,7 @@ async def compute_chunks(
         actual_valid_sentences = -1
 
     if count_tokens(first_chunk_text) > max_token_size:
-        recursive_chunks = await compute_chunks(
+        recursive_chunks = await _compute_chunks(
             sentences=("\n".join(first_chunk) + "\n".join(next_chunk[: actual_valid_sentences + 1])).split("\n"),
             min_token_size=min_token_size,
             max_token_size=max_token_size,
@@ -167,7 +167,7 @@ async def compute_chunks(
     else:
         created_chunks.append(first_chunk_text)
 
-    return await compute_chunks(
+    return await _compute_chunks(
         sentences=next_chunk[actual_valid_sentences + 1 :],
         min_token_size=min_token_size,
         max_token_size=max_token_size,
@@ -194,7 +194,7 @@ async def create_chunks(
     elif overlap_percentage > 100:
         overlap_percentage = 100
 
-    chunks = await compute_chunks(
+    chunks = await _compute_chunks(
         sentences=text.split("\n"),
         min_token_size=min_token_size,
         max_token_size=max_token_size,

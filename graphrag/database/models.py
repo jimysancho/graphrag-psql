@@ -46,15 +46,7 @@ class Entity(Base):
     sources = relationship("Relationship", back_populates="source_entity", foreign_keys="[Relationship.source_id]", uselist=True)
     targets = relationship("Relationship", back_populates="target_entity", foreign_keys="[Relationship.target_id]", uselist=True)
 
-# FIXME -> Do not create Relationship table. Create Edge table: 
-"""
-entity_id: str
-source: bool
-...
-"""
 
-# class Edge(Base):
-#     __tablename__ = "edge"
 class Relationship(Base):
     
     __tablename__ = "relationship"

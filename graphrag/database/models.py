@@ -35,8 +35,7 @@ class Entity(Base):
     
     hash = Column(String, nullable=False, index=True)
     entity_name = Column(String, nullable=False)
-    # NOTE -> entity type is yet to be defined for the task
-    # entity_type = Column(Enum(EntityType), nullable=True)
+    entity_type = Column(String, nullable=True, default="unknown")
     description = Column(String, nullable=False)
     entity_embedding = Column(Vector(1536))
     

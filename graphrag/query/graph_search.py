@@ -41,7 +41,7 @@ async def query_graph(query: str) -> Any:
     
     neighbors_nodes = [graph.nodes.get(neighbor) for neighbor in neighbors]
     neighbor_chunk_ids_mapping = {
-        node['entity_name']: set(node['chunk_id'].split(", ")) for node in neighbors_nodes
+        node['entity_name']: set(node['chunk_id'].split(", ")) for node in neighbors_nodes if node
     }
     
     connected_nodes: Dict[str, Dict[str, Any]] = {}

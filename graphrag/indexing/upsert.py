@@ -41,6 +41,7 @@ async def upsert_data_and_create_graph(
     ])
     
     db = next(get_db())
+    not_valid_relationships = set()
     
     for index, chunk in enumerate(chunks):
         
@@ -88,9 +89,11 @@ async def upsert_data_and_create_graph(
         
         if source_id is None:
             print(f"Source: {relationship.source_entity} was not found in the database")
+            not_valid_relationships.add((relationship.source_entity, relationship.target_entity))
             continue
         if target_id is None:
             print(f"Target: {relationship.target_entity} was not found in the database")
+            not_valid_relationships.add((relationship.source_entity, relationship.target_entity))
             continue
         source_id = source_id.entity_id
         target_id = target_id.entity_id
@@ -120,6 +123,7 @@ async def upsert_data_and_create_graph(
         )
     
     for relationship in relationships:
+        if (relationship.source_entity, relationship.target_entity) in not_valid_relationships: continue
         relationship.relationship_keywords = ", ".join(list(relationship.relationship_keywords))
         relationship.chunk_id = ", ".join(list(relationship.chunk_id)) if isinstance(relationship.chunk_id, set) else relationship.chunk_id
         graph.add_edge(

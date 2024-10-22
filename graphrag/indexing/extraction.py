@@ -18,6 +18,7 @@ import asyncio
 import networkx as nx
 
 import uuid
+import os
 
 
 def _merge_entities(entities: List[EntityModel], threshold: int=75) -> Tuple[List[EntityModel], Dict[str, List[str]]]:
@@ -162,6 +163,12 @@ async def upsert_data_and_create_graph(
     entities: List[EntityModel], relationships: List[RelationshipModel], chunks: List[ChunkModel]
 ) -> nx.Graph:
     
+    GRAPH_PATH = "./graph.graphml"
+    
+    if os.path.exists(GRAPH_PATH):
+        graph = nx.read_graphml(GRAPH_PATH)
+        return graph
+
     chunk_embeddings_task = create_embeddings(texts=[chunk.text for chunk in chunks])
     entities_embeddings_task = create_embeddings(texts=[entity.entity_name for entity in entities])
     relationship_embeddings_task = create_embeddings(texts=[
@@ -247,18 +254,20 @@ async def upsert_data_and_create_graph(
     graph = nx.Graph()
     
     for entity in entities:
-        entity.chunk_id = ", ".join(list(entity.chunk_id))
+        print(entity.chunk_id)
+        entity.chunk_id = ", ".join(list(entity.chunk_id)) if isinstance(entity.chunk_id, set) else entity.chunk_id
         graph.add_node(
             entity.entity_name, **entity.model_dump()
         )
     
     for relationship in relationships:
+        print(relationship.chunk_id)
         relationship.relationship_keywords = ", ".join(list(relationship.relationship_keywords))
-        relationship.chunk_id = ", ".join(list(relationship.chunk_id))
+        relationship.chunk_id = ", ".join(list(relationship.chunk_id)) if isinstance(relationship.chunk_id, set) else relationship.chunk_id
         graph.add_edge(
             relationship.source_entity, relationship.target_entity, **relationship.model_dump()
         )
     
     print(f"Graph created: {len(graph.nodes())} nodes and {len(graph.edges())} edges")
-    nx.write_graphml(graph, "./graph.graphml")
+    nx.write_graphml(graph, GRAPH_PATH)
     return graph

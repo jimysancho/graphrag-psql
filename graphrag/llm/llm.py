@@ -8,16 +8,12 @@ from typing import Dict, Any, List
 import os
 
 
-entity_types = ", ".join([
-    "Sintoma", "Medicacion", "Enfermedad", "Diagnostico"
-])
-
 RETRIES = 3
 
-async def extract_entities_completion(chunk: str, history: str | None=None) -> Dict[str, Any] | None:
+async def extract_entities_completion(chunk: str, entity_types: List[str], history: str | None=None) -> Dict[str, Any] | None:
 
     client = AsyncClient(api_key=os.environ['OPENAI_API_KEY'])
-    
+    entity_types = ", ".join(entity_types)
     for _ in range(RETRIES):
         if history is None:
             response = await client.chat.completions.create(
@@ -57,7 +53,7 @@ async def create_embeddings(texts: List[str]) -> List[List[float]]:
     return [result.embedding for result in results.data]
 
 
-async def extract_keywords_from_query(query: str) -> Dict[str, List[str]]:
+async def extract_keywords_from_query(query: str, return_all: bool=True) -> Dict[str, List[str]] | List[str]:
 
     client = AsyncClient(api_key=os.environ['OPENAI_API_KEY'])
     
@@ -66,22 +62,36 @@ async def extract_keywords_from_query(query: str) -> Dict[str, List[str]]:
             messages=[
                 {"role": "system", "content": KEYWORD_EXTRACTION.replace("{query}", query)}
                 ], 
-            model='gpt-4o-mini'
+            model='gpt-4o-mini', 
+            temperature=0
         )
         
         answer = response.choices[0].message.content
         try:
-            return eval(answer) if answer is not None else None
+            if answer is not None:
+                keywords = eval(answer)
+                if return_all:
+                    all_keywords = []
+                    for level_keywords in keywords.values(): all_keywords.extend(level_keywords)
+                    return all_keywords
+
         except SyntaxError as e:
             corrected_response = await client.chat.completions.create(
                 messages=[
                     {"role": "system", "content": BAD_PYTHON_DICTIONARY_PARSING.replace("{dict}", str(answer)).replace("{error}", str(e))}
                 ], 
-                model='gpt-4o-mini'
+                model='gpt-4o-mini', 
+                temperature=0
             )
             corrected_answer = corrected_response.choices[0].message.content
             try:
-                return eval(corrected_answer) if corrected_answer is not None else None
+                if corrected_answer is None:
+                    continue
+                keywords = eval(corrected_answer)
+                if return_all:
+                    all_keywords = []
+                    for level_keywords in keywords.values(): all_keywords.extend(level_keywords)
+                    return all_keywords
             except SyntaxError as e:
                 continue
     return {}

@@ -1,7 +1,8 @@
 from openai import AsyncClient
 from graphrag.llm.prompt import (BAD_PYTHON_DICTIONARY_PARSING, 
                                  ENTITY_EXTRACTION_PROMPT,
-                                 CONTINUE_EXTRACTING_ENTITIES)
+                                 CONTINUE_EXTRACTING_ENTITIES, 
+                                 KEYWORD_EXTRACTION)
 
 from typing import Dict, Any, List
 import os
@@ -54,3 +55,33 @@ async def create_embeddings(texts: List[str]) -> List[List[float]]:
     client = AsyncClient(api_key=os.environ["OPENAI_API_KEY"])
     results = await client.embeddings.create(input=texts, model="text-embedding-3-small")
     return [result.embedding for result in results.data]
+
+
+async def extract_keywords_from_query(query: str) -> Dict[str, List[str]]:
+
+    client = AsyncClient(api_key=os.environ['OPENAI_API_KEY'])
+    
+    for _ in range(RETRIES):
+        response = await client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": KEYWORD_EXTRACTION.replace("{query}", query)}
+                ], 
+            model='gpt-4o-mini'
+        )
+        
+        answer = response.choices[0].message.content
+        try:
+            return eval(answer) if answer is not None else None
+        except SyntaxError as e:
+            corrected_response = await client.chat.completions.create(
+                messages=[
+                    {"role": "system", "content": BAD_PYTHON_DICTIONARY_PARSING.replace("{dict}", str(answer)).replace("{error}", str(e))}
+                ], 
+                model='gpt-4o-mini'
+            )
+            corrected_answer = corrected_response.choices[0].message.content
+            try:
+                return eval(corrected_answer) if corrected_answer is not None else None
+            except SyntaxError as e:
+                continue
+    return {}

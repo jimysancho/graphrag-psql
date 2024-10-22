@@ -5,6 +5,10 @@ from graphrag.indexing.types import (
     HighLevelKeywords
 )
 
+from graphrag.database.base import get_db
+from graphrag.database.models import Chunk, Entity, Relationship
+
+from graphrag.indexing.utils import calculate_hash
 from graphrag.llm.llm import extract_entities_completion
 
 from typing import (List, 
@@ -18,6 +22,39 @@ import uuid
 import asyncio
 import uuid
 
+
+def _extract_chunk_info_from_db_if_exists(chunk: str) -> Tuple[List[EntityModel], List[RelationshipModel], ChunkModel] | None:
+
+    db = next(get_db())
+    hash = "chunk-" + calculate_hash(text=chunk)
+    exists = db.query(Chunk).filter(Chunk.hash == hash).first()
+    if exists:
+        entities_models, relationships_models = [], [] 
+        entities = db.query(Entity).filter(Entity.chunk_id == exists.chunk_id).all()
+        for entity in entities:
+            entity_model = EntityModel(
+                entity_name=entity.entity_name, 
+                entity_type=entity.entity_type, 
+                entity_description=entity.description,
+                chunk_id=str(exists.chunk_id)
+            )
+            entities_models.append(entity_model)
+        relationships = db.query(Relationship).filter(Relationship.chunk_id == exists.chunk_id).all()
+        for rel in relationships:
+            rel_model = RelationshipModel(
+                source_entity=rel.source_entity.entity_name, 
+                target_entity=rel.target_entity.entity_name,
+                relationship_description=rel.description,
+                relationship_strength=rel.weight,
+                chunk_id=str(exists.chunk_id),
+                relationship_keywords=rel.keywords
+            )
+            relationships_models.append(rel_model)
+        db.close()
+        return entities_models, relationships_models, ChunkModel(text=exists.text, id=str(exists.chunk_id))
+    db.close()
+    return None
+    
 
 def _merge_entities(entities: List[EntityModel], threshold: int=75) -> Tuple[List[EntityModel], Dict[str, Set[str]]]:
     
@@ -84,9 +121,9 @@ def _merge_relationships(
         source, target = relationship.source_entity, relationship.target_entity
         try:
             if source in kept_vs_merged_entities:
-                relationship.source_entity = kept_vs_merged_entities[source][0]
+                relationship.source_entity = list(kept_vs_merged_entities[source])[0]
             if target in kept_vs_merged_entities:
-                relationship.target_entity = kept_vs_merged_entities[target][0]
+                relationship.target_entity = list(kept_vs_merged_entities[target])[0]
         except (KeyError, IndexError):
             print(f"Something went wrong for edge: {(source, target)}")
             continue
@@ -111,6 +148,9 @@ def _merge_relationships(
 
 async def _extract_graph_information_from_chunk(chunk: str, entity_types: List[str], gleaning: int=1) -> Tuple[List[EntityModel], List[RelationshipModel], ChunkModel] | None:
     
+    already_exists = _extract_chunk_info_from_db_if_exists(chunk=chunk)
+    if already_exists is not None:
+        return already_exists
     chunk_info: Dict[str, Any] = {}
     for _ in range(gleaning):
         gleaning_chunk_info = await extract_entities_completion(chunk=chunk, history=None, entity_types=entity_types)
@@ -133,7 +173,7 @@ async def _extract_graph_information_from_chunk(chunk: str, entity_types: List[s
     return entities_models, relationships_models, chunk_model
 
 
-async def extract_entities(chunks: List[str], entity_types: List[str], gleaning: int=1) -> Tuple[List[EntityModel], List[RelationshipModel], Dict[str, List[str]], List[ChunkModel]]:
+async def extract_entities(chunks: List[str], entity_types: List[str], gleaning: int=1) -> Tuple[List[EntityModel], List[RelationshipModel], Dict[str, Set[str]], List[ChunkModel]]:
 
     if len(chunks) > 20:
         results = []

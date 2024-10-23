@@ -17,6 +17,7 @@ from typing import (List,
                     Any, 
                     Set)
 from fuzzywuzzy import fuzz
+from openai import RateLimitError
 
 import uuid
 import asyncio
@@ -147,14 +148,16 @@ def _merge_relationships(
     return list(merged_relationships.values())
                 
 
-async def _extract_graph_information_from_chunk(chunk: str, entity_types: List[str], gleaning: int=1) -> Tuple[List[EntityModel], List[RelationshipModel], ChunkModel] | None:
+async def _extract_graph_information_from_chunk(chunk: str, entity_types: Dict[str, str], gleaning: int=1) -> Tuple[List[EntityModel], List[RelationshipModel], ChunkModel] | None:
     
     already_exists = _extract_chunk_info_from_db_if_exists(chunk=chunk)
     if already_exists is not None:
         return already_exists
     chunk_info: Dict[str, Any] = {}
     for _ in range(gleaning):
-        gleaning_chunk_info = await extract_entities_completion(chunk=chunk, history=None, entity_types=entity_types)
+        gleaning_chunk_info = await extract_entities_completion(chunk=chunk, 
+                                                                history=None, 
+                                                                entity_types=entity_types)
         if gleaning_chunk_info is None: continue
     
         more_chunk_info = await extract_entities_completion(
@@ -175,17 +178,29 @@ async def _extract_graph_information_from_chunk(chunk: str, entity_types: List[s
     return entities_models, relationships_models, chunk_model
 
 
-async def extract_entities(chunks: List[str], entity_types: List[str], gleaning: int=1) -> Tuple[List[EntityModel], List[RelationshipModel], Dict[str, Set[str]], List[ChunkModel]]:
+async def extract_entities(chunks: List[str], entity_types: Dict[str, str], gleaning: int=1, batch: int=15) -> Tuple[List[EntityModel], List[RelationshipModel], Dict[str, Set[str]], List[ChunkModel]]:
 
-    if len(chunks) > 20:
+    if len(chunks) > batch:
         results = []
-        for batch in range(0, len(chunks), 20):
-            batch_chunks = chunks[batch: batch + 20]
-            results.extend(
-                await asyncio.gather(*[
-                    _extract_graph_information_from_chunk(chunk=chunk, gleaning=gleaning, entity_types=entity_types) for chunk in batch_chunks
-                ])
-            )
+        for k in range(0, len(chunks), batch):
+            batch_chunks = chunks[k: k + batch]
+            try:
+                results.extend(
+                    await asyncio.gather(*[
+                        _extract_graph_information_from_chunk(chunk=chunk, gleaning=gleaning, entity_types=entity_types) for chunk in batch_chunks
+                    ])
+                )
+            except RateLimitError:
+                print("Rate limit error. Sleeping for a few seconds...")
+                await asyncio.sleep(2)
+                sub_batch = batch // 2
+                for j in range(0, len(batch_chunks), sub_batch):
+                    results.extend(
+                        await asyncio.gather(*[
+                            _extract_graph_information_from_chunk(chunk=chunk, gleaning=gleaning, entity_types=entity_types) for chunk in batch_chunks[j: j + sub_batch]
+                        ])
+                    )
+                    await asyncio.sleep(1)
             await asyncio.sleep(1)
     else:
         results = await asyncio.gather(*[

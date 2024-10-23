@@ -2,7 +2,8 @@ from openai import AsyncClient
 from graphrag.llm.prompt import (BAD_PYTHON_DICTIONARY_PARSING, 
                                  ENTITY_EXTRACTION_PROMPT,
                                  CONTINUE_EXTRACTING_ENTITIES, 
-                                 KEYWORD_EXTRACTION)
+                                 KEYWORD_EXTRACTION, 
+                                 GENERATE_RESPONSE)
 
 from typing import Dict, Any, List
 import os
@@ -95,3 +96,15 @@ async def extract_keywords_from_query(query: str, return_all: bool=True) -> Dict
             except SyntaxError as e:
                 continue
     return {}
+
+async def generate_response(query: str, context: str) -> str | None:
+    client = AsyncClient(api_key=os.environ['OPENAI_API_KEY'])
+    response = await client.chat.completions.create(
+        messages=[{"role": "system", "content": GENERATE_RESPONSE.replace("{context}", context)},
+                  {"role": "user", "content": query}], 
+        model='gpt-4o-mini', 
+        temperature=0
+    )
+    
+    answer = response.choices[0].message.content
+    return answer

@@ -37,9 +37,9 @@ This is an example of the output:
   "content_keywords": [<keyword>, <keyword>, <keyword>, ...]
 }
 </example>
-Entity types: 
+This are the available entity types with some features of each one: 
 <entity_types>
-{entity_types}
+{entity_types_description}
 </entity_types>
 This is the text: 
 <text>

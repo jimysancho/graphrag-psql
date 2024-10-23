@@ -48,12 +48,13 @@ async def query_graph(query: str) -> Any:
 
     for index, (keyword_node, keyword_edges) in enumerate(zip(nodes, edges)):
         node: str = keyword_node['entity_name']
+        del keyword_node['entity_name']
         if node in connected_nodes: continue
         connected_nodes[node] = {}
         chunk_ids = keyword_node['chunk_id'].split(", ")
         for chunk_id in chunk_ids:
             if chunk_id not in connected_nodes[node]: 
-                connected_nodes[node][chunk_id] = {"relation_counts": 0, "keywords": set(), "order": index}
+                connected_nodes[node][chunk_id] = {"relation_counts": 0, "keywords": set(), "order": index, "graph_node": keyword_node}
             for edge in keyword_edges:
                 neighbor = edge[1]
                 neighbor_data = neighbor_chunk_ids_mapping[neighbor]
@@ -74,4 +75,4 @@ async def query_graph(query: str) -> Any:
 
     connected_nodes = final_result
             
-    return connected_nodes
+    return connected_nodes, keywords

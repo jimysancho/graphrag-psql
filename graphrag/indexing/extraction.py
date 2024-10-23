@@ -89,6 +89,7 @@ def _merge_entities(entities: List[EntityModel], threshold: int=75) -> Tuple[Lis
         if most_sim_entities:
             for most_sim_entity in most_sim_entities:
                 most_sim_key = (most_sim_entity.entity_name, most_sim_entity.entity_type, most_sim_entity.entity_description)
+                print(f"{most_sim_key[:2]} has been identified as similar to another entity")
                 merged_entities.add(most_sim_key)
                 modified_entities[(entity.entity_name, entity.entity_type, entity.entity_description, entity.get_chunk_id)].append(most_sim_entity)
                 if most_sim_entity.entity_name not in kept_vs_merged:
@@ -165,6 +166,7 @@ async def _extract_graph_information_from_chunk(chunk: str, entity_types: List[s
     chunk_model = ChunkModel(text=chunk, id=str(uuid.uuid4()))
 
     entities, relationships, high_level_keywords = [chunk_info[key] for key in ("entities", "relationships", "content_keywords")]
+    if isinstance(high_level_keywords, list): high_level_keywords = {"content_keywords": high_level_keywords}
     entities_models, relationships_models, high_level_keywords_models = [
         [model(**val, chunk_id={chunk_model.id}) for val in values] if isinstance(values, list) else [model(**values, chunk_id={chunk_model.id})]
         for model, values in zip((EntityModel, RelationshipModel, HighLevelKeywords), 

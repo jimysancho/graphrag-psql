@@ -41,7 +41,7 @@ class RelationshipModel(BaseModel):
     def remove_tildes(self):
         self.source_entity = unidecode(self.source_entity).lower().strip()
         self.target_entity = unidecode(self.target_entity).lower().strip()
-        self.relationship_keywords = self.relationship_keywords.split(", ")
+        self.relationship_keywords = self.relationship_keywords.split(", ") if isinstance(self.relationship_keywords, str) else self.relationship_keywords
         self.relationship_text = f"{self.source_entity} is related to {self.target_entity} because of: {self.relationship_description}"
         return self
 
@@ -55,12 +55,12 @@ class RelationshipModel(BaseModel):
     
 
 class HighLevelKeywords(BaseModel):
-    content_keywords: str
+    content_keywords: str | List[str]
     chunk_id: Set[str] | str
     
     @model_validator(mode='after')
     def string_to_list(self):
-        self.content_keywords = self.content_keywords.split(", ")
+        self.content_keywords = self.content_keywords.split(", ") if isinstance(self.content_keywords, str) else self.content_keywords
         return self
 
 

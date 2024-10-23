@@ -4,13 +4,15 @@ from graphrag.query.graph_search import query_graph
 from graphrag.database.base import get_db
 from graphrag.database.models import Chunk
 
-from typing import List, Tuple, Any
+from typing import List, Tuple, Any, Dict
 
 
-async def aquery(query: str, max_nodes: int=3) -> Tuple[str | None, List[str], List[Any], List[str]]:
+async def aquery(
+    query: str, top_k: int, max_nodes: int=3, order_range: int=5
+) -> Tuple[str | None, List[str], Dict[str, Dict[str, Any]], List[str]]:
     
     db = next(get_db())
-    nodes, keywords = await query_graph(query=query)
+    nodes, keywords = await query_graph(query=query, top_k=top_k, order_range=order_range)
     chunk_texts: List[str] = []
     for chunk_id in nodes:
         if len(chunk_texts) >= max_nodes:

@@ -63,7 +63,7 @@ async def query_graph(query: str) -> Any:
                     connected_nodes[node][chunk_id]['keywords'].add(neighbor)
 
     final_result = {}
-    order_range = 3 # FIXME -> do not hardcode this
+    order_range = 5 # FIXME -> do not hardcode this
     for node, chunk_data in connected_nodes.items():
         for chunk_id, data in chunk_data.items():
             if chunk_id not in final_result:

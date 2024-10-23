@@ -3,19 +3,19 @@ from graphrag.query.vector_search import _similarity_search
 from graphrag.query.types import Node
 from graphrag.llm.llm import extract_keywords_from_query
 
-from typing import Any, Dict
+from typing import Any, Dict, Tuple, List
 
 import networkx as nx
 
 
-async def query_graph(query: str) -> Any:
+async def query_graph(query: str, top_k: int, order_range: int) -> Tuple[Dict[str, Dict[str, Any]], List[str]]:
 
     graph: nx.Graph = await upsert_data_and_create_graph(entities=[], 
                                                          relationships=[], 
                                                          chunks=[])
     
     keywords = await extract_keywords_from_query(query=query, return_all=True)
-    entities_with_scores = await _similarity_search(text=keywords, table='entity', top_k=60) # FIXME -> do not hardcode top_k
+    entities_with_scores = await _similarity_search(text=keywords, table='entity', top_k=top_k)
 
     entities = [entity for entity, _ in entities_with_scores]
     
@@ -63,7 +63,6 @@ async def query_graph(query: str) -> Any:
                     connected_nodes[node][chunk_id]['keywords'].add(neighbor)
 
     final_result = {}
-    order_range = 5 # FIXME -> do not hardcode this
     for node, chunk_data in connected_nodes.items():
         for chunk_id, data in chunk_data.items():
             if chunk_id not in final_result:

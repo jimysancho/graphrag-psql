@@ -1,5 +1,5 @@
 from graphrag.llm.llm import generate_response
-from graphrag.query.graph_search import local_query_graph
+from graphrag.query.graph_search import local_query_graph, global_query_graph
 
 from graphrag.database.base import get_db
 from graphrag.database.models import Chunk
@@ -25,3 +25,21 @@ async def _local_query(
     response = await generate_response(context=context, query=query)
     db.close()
     return response, chunk_texts, nodes, keywords
+
+
+async def _global_query(
+    query: str, top_k: int, max_nodes: int=3, alpha: float=0.7
+) -> Tuple[str | None, List[str], Dict[str, Dict[str, Any]], List[str]]:
+    
+    db = next(get_db())
+    chunks, keywords = await global_query_graph(query=query, top_k=top_k, alpha=alpha, edge_nodes=max_nodes)
+    chunk_texts: List[str] = []
+    for chunk_id in chunks:
+        chunk_texts.append(
+            db.get(Chunk, chunk_id).text
+        )
+
+    context = "\n".join(chunk_texts)
+    response = await generate_response(context=context, query=query)
+    db.close()
+    return response, chunk_texts, chunks, keywords

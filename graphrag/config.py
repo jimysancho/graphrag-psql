@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, ValidationError
 from typing import Dict
 
 
@@ -12,4 +12,9 @@ class GlobalConfig(BaseModel):
     keywords_top_k: int = Field(default=60, description="Number of entities to retrieve via similarity search over keyword vector database")
     graph_top_k: int = Field(default=5, description="Number of chunks to use as final context")
     order_range: int = Field(default=5, description="When getting the most connected components, max number of order difference in similarity search to substitute one communiy over other")    
+    alpha: float = Field(default=0.7, description="Importance to similarity vs weight of relationships. Value between 0 and 1")
     
+    @field_validator('alpha')
+    def validate_alpha(cls, value):
+        if not (0 <= value <= 1):
+            raise ValidationError(f"{value} is not a valid value for alpha. It must be between 0 and 1")

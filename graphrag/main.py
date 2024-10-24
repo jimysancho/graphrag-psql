@@ -1,6 +1,6 @@
-from graphrag.indexing.upsert import upsert_data_and_create_graph
-from graphrag.indexing.extraction import extract_entities
-from graphrag.indexing.chunking import create_chunks
+from graphrag.indexing import (create_chunks, 
+                               upsert_data_and_create_graph, 
+                               extract_entities)
 from graphrag.query.generate import aquery
 
 from graphrag.config import GlobalConfig

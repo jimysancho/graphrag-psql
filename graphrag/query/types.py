@@ -17,3 +17,7 @@ class Keywords(BaseModel):
 class Node(BaseModel):
     element: Any
     degree: int
+    
+class Edge(BaseModel):
+    edge: Any
+    degree: int

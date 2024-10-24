@@ -5,9 +5,9 @@ from graphrag.llm.llm import extract_keywords_from_query
 from graphrag.database.base import get_db
 from graphrag.database.models import Relationship, Entity
 
-from typing import Any, Dict, Tuple, List
-from collections import Counter
+from typing import Any, Dict, Tuple, List, Set, Any
 from sqlalchemy.orm import aliased
+from sqlalchemy import case
 
 import networkx as nx
 
@@ -79,7 +79,10 @@ async def local_query_graph(query: str, top_k: int, order_range: int) -> Tuple[D
     return connected_nodes, keywords
 
 
-async def global_query_graph(query: str, top_k: int, order_range: int) -> Tuple[Counter, List[str]]:
+async def global_query_graph(query: str, top_k: int, alpha: float, edge_nodes: int) -> Tuple[Dict[str, int], List[str]]:
+    
+    if not (0 <= alpha <= 1):
+        raise ValueError(f"{alpha} is not valid. It must be between 0 and 1")
     
     db = next(get_db())
 
@@ -90,13 +93,18 @@ async def global_query_graph(query: str, top_k: int, order_range: int) -> Tuple[
     keywords = await extract_keywords_from_query(query=query, return_all=True)
     relationships_with_scores = await _similarity_search(text=keywords, table='relationship', top_k=top_k)
     relationships = [r for r, _ in relationships_with_scores]
-    
+    relationship_ids = [r.relationship_id for r in relationships]
+    ordering = case(
+        *[(Relationship.relationship_id == relationship_id, index) for index, relationship_id in enumerate(relationship_ids)]
+    )
+
     source_entity, target_entity = aliased(Entity), aliased(Entity)
     relationship_with_entities = db.query(Relationship, source_entity.entity_name, target_entity.entity_name)\
         .join(source_entity, Relationship.source_id == source_entity.entity_id)\
             .join(target_entity, Relationship.target_id == target_entity.entity_id)\
-                .filter(Relationship.relationship_id.in_([r.relationship_id for r in relationships]))\
-                    .all()
+                .filter(Relationship.relationship_id.in_(relationship_ids))\
+                    .order_by(ordering)\
+                        .all()
     
     relationship_edges = [
         graph.edges.get((source, target)) for (_, source, target) in relationship_with_entities
@@ -112,12 +120,51 @@ async def global_query_graph(query: str, top_k: int, order_range: int) -> Tuple[
         for edge in edge_models
     ]
     
-    entity_names_of_edges = set()
-    for (_, s, t) in relationship_with_entities:
-        entity_names_of_edges.add(s)
-        entity_names_of_edges.add(t)
-     
+    edges = sorted(edges, key=lambda x: x['degree'])
+
+    chunk_to_edges: Dict[str, Set[Tuple[str, str]]] = {}
     chunk_ids = []
-    for edge in edges: chunk_ids.extend(edge['chunk_id'].split(", "))
+    for edge in edges: 
+        chunk_ids_of_edge = edge['chunk_id'].split(", ")
+        chunk_ids.append(chunk_ids_of_edge)
+        for c_id in chunk_ids_of_edge:
+            if c_id not in chunk_to_edges: chunk_to_edges[c_id] = {(edge['source_entity'], edge['target_entity'])}
+            else: chunk_to_edges[c_id].add((edge['source_entity'], edge['target_entity']))
     
-    return Counter(chunk_ids), keywords
+    chunk_ids_to_metric = {}
+
+    for index, chunk_edge_ids in enumerate(chunk_ids):
+        for chunk_id in chunk_edge_ids:
+            edges_of_chunk = chunk_to_edges[chunk_id]
+            edges_of_chunk_graph = [graph.edges.get(k) for k in edges_of_chunk]
+            if chunk_id not in chunk_ids_to_metric:
+                chunk_ids_to_metric[chunk_id] = {
+                    'order': index, 
+                    'weight': sum([edge['relationship_strength'] for edge in edges_of_chunk_graph]), 
+                    'n': len(edges_of_chunk_graph), 
+                    'edges': edges_of_chunk_graph
+                }
+            else:
+                chunk_ids_to_metric[chunk_id]['order'] += index
+                chunk_ids_to_metric[chunk_id]['weight'] += sum([edge['relationship_strength'] for edge in edges_of_chunk_graph])
+                chunk_ids_to_metric[chunk_id]['n'] += len(edges_of_chunk_graph)
+                chunk_ids_to_metric[chunk_id]['edges'].extend(edges_of_chunk_graph)
+
+    for chunk_id, metrics in chunk_ids_to_metric.items():
+        metrics['order'] /= metrics['n']
+        metrics['weight'] /= metrics['n']
+        
+    _, max_weight = max(chunk_ids_to_metric.items(), key=lambda x: x[1]['weight'])
+    max_weight = max_weight['weight']
+    for chunk_id, metrics in chunk_ids_to_metric.items():
+        metrics['importance'] = (1 - metrics['order'] / index) * alpha + (metrics['weight'] / max_weight) * (1 - alpha)
+        
+    chunk_ids_to_metric_sorted = dict(sorted(chunk_ids_to_metric.items(), key=lambda x: -x[1]['importance']))
+    final_chunks: Dict[str, Dict[str, Any]] = {}
+
+    for chunk_id in chunk_ids_to_metric_sorted:
+        if len(final_chunks) >= edge_nodes:
+            break
+        final_chunks[chunk_id] = chunk_ids_to_metric_sorted[chunk_id]
+
+    return final_chunks, keywords

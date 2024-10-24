@@ -1,7 +1,7 @@
 from graphrag.indexing import (create_chunks, 
                                upsert_data_and_create_graph, 
                                extract_entities)
-from graphrag.query.generate import aquery
+from graphrag.query.generate import _local_query
 
 from graphrag.config import GlobalConfig
 from typing import List, Dict, Tuple, Any
@@ -17,6 +17,6 @@ async def insert(text: str, config: GlobalConfig) -> nx.Graph:
     graph = await upsert_data_and_create_graph(entities=entities, relationships=relationships, chunks=chunk_models)
     return graph
 
-async def query(query: str, config: GlobalConfig) -> Tuple[str | None, List[str], Dict[str, Dict[str, Any]], List[str]]:
-    response, chunk_texts, nodes, keywords = await aquery(query=query, top_k=config.keywords_top_k, max_nodes=config.graph_top_k, order_range=config.order_range)
+async def local_query(query: str, config: GlobalConfig) -> Tuple[str | None, List[str], Dict[str, Dict[str, Any]], List[str]]:
+    response, chunk_texts, nodes, keywords = await _local_query(query=query, top_k=config.keywords_top_k, max_nodes=config.graph_top_k, order_range=config.order_range)
     return response, chunk_texts, nodes, keywords

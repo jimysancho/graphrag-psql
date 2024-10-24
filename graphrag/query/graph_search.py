@@ -1,9 +1,13 @@
 from graphrag.indexing.upsert import upsert_data_and_create_graph
 from graphrag.query.vector_search import _similarity_search
-from graphrag.query.types import Node
+from graphrag.query.types import Node, Edge
 from graphrag.llm.llm import extract_keywords_from_query
+from graphrag.database.base import get_db
+from graphrag.database.models import Relationship, Entity
 
 from typing import Any, Dict, Tuple, List
+from collections import Counter
+from sqlalchemy.orm import aliased
 
 import networkx as nx
 
@@ -30,8 +34,6 @@ async def local_query_graph(query: str, top_k: int, order_range: int) -> Tuple[D
     edges = [
         list(graph.edges(node['entity_name'])) for node in nodes
     ]
-    
-    chunk_ids = [node['chunk_id'].split(", ") for node in nodes]
         
     neighbors = []
     for node in nodes:
@@ -75,3 +77,47 @@ async def local_query_graph(query: str, top_k: int, order_range: int) -> Tuple[D
     connected_nodes = final_result
             
     return connected_nodes, keywords
+
+
+async def global_query_graph(query: str, top_k: int, order_range: int) -> Tuple[Counter, List[str]]:
+    
+    db = next(get_db())
+
+    graph: nx.Graph = await upsert_data_and_create_graph(entities=[], 
+                                                         relationships=[], 
+                                                         chunks=[])
+    
+    keywords = await extract_keywords_from_query(query=query, return_all=True)
+    relationships_with_scores = await _similarity_search(text=keywords, table='relationship', top_k=top_k)
+    relationships = [r for r, _ in relationships_with_scores]
+    
+    source_entity, target_entity = aliased(Entity), aliased(Entity)
+    relationship_with_entities = db.query(Relationship, source_entity.entity_name, target_entity.entity_name)\
+        .join(source_entity, Relationship.source_id == source_entity.entity_id)\
+            .join(target_entity, Relationship.target_id == target_entity.entity_id)\
+                .filter(Relationship.relationship_id.in_([r.relationship_id for r in relationships]))\
+                    .all()
+    
+    relationship_edges = [
+        graph.edges.get((source, target)) for (_, source, target) in relationship_with_entities
+    ]
+
+    db.close()
+    edge_models = [
+        Edge(edge=edge, degree=graph.degree(source_entity) + graph.degree(target_entity)) for (edge, (_, source_entity, target_entity)) in zip(relationship_edges, relationship_with_entities)
+    ]
+    
+    edges = [
+        {**edge.model_dump()['edge'], 'degree': edge.model_dump()['degree']}
+        for edge in edge_models
+    ]
+    
+    entity_names_of_edges = set()
+    for (_, s, t) in relationship_with_entities:
+        entity_names_of_edges.add(s)
+        entity_names_of_edges.add(t)
+     
+    chunk_ids = []
+    for edge in edges: chunk_ids.extend(edge['chunk_id'].split(", "))
+    
+    return Counter(chunk_ids), keywords

@@ -7,7 +7,7 @@ from graphrag.database.models import Chunk
 from typing import List, Tuple, Any, Dict
 
 
-async def aquery(
+async def _local_query(
     query: str, top_k: int, max_nodes: int=3, order_range: int=5
 ) -> Tuple[str | None, List[str], Dict[str, Dict[str, Any]], List[str]]:
     

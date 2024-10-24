@@ -1,10 +1,10 @@
 from graphrag.indexing import (create_chunks, 
                                upsert_data_and_create_graph, 
                                extract_entities)
-from graphrag.query.generate import _local_query, _global_query
+from graphrag.query.generate import _local_query, _global_query, _hybrid_query, _naive_rag
 
 from graphrag.config import GlobalConfig
-from typing import List, Dict, Tuple, Any
+from typing import List, Dict, Tuple, Any, Set
 
 import networkx as nx
 
@@ -26,3 +26,9 @@ async def local_query(query: str, config: GlobalConfig) -> Tuple[str | None, Lis
 async def global_query(query: str, config: GlobalConfig) -> Tuple[str | None, List[str], Dict[str, Any], List[str]]:
     response, chunk_texts, chunks, keywords = await _global_query(query=query, top_k=config.keywords_top_k, max_nodes=config.graph_top_k, alpha=config.alpha)
     return response, chunk_texts, chunks, keywords
+
+async def hybrid_query(query: str, config: GlobalConfig) -> Tuple[str | None, List[str], Tuple[Dict[str, Any], Dict[str, Dict[str, Any]]], Set[str]]:
+    return await _hybrid_query(query=query, top_k=config.keywords_top_k, max_nodes=config.graph_top_k, alpha=config.alpha, order_range=config.order_range)
+
+async def naive_query(query: str, config: GlobalConfig) -> Tuple[str, List[str]]:
+    return await _naive_rag(query=query, top_k=config.graph_top_k)

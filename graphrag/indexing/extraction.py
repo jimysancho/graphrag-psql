@@ -167,8 +167,12 @@ async def _extract_graph_information_from_chunk(chunk: str, entity_types: Dict[s
             chunk_info.update(more_chunk_info)
     
     chunk_model = ChunkModel(text=chunk, id=str(uuid.uuid4()))
-
-    entities, relationships, high_level_keywords = [chunk_info[key] for key in ("entities", "relationships", "content_keywords")]
+    try:
+        entities, relationships, high_level_keywords = [chunk_info[key] for key in ("entities", "relationships", "content_keywords")]
+    except KeyError as e:
+        print(f"KeyError -> {e}")
+        print(chunk_info)
+        raise e
     if isinstance(high_level_keywords, list): high_level_keywords = {"content_keywords": high_level_keywords}
     entities_models, relationships_models, high_level_keywords_models = [
         [model(**val, chunk_id={chunk_model.id}) for val in values] if isinstance(values, list) else [model(**values, chunk_id={chunk_model.id})]

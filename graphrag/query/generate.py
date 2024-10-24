@@ -1,5 +1,5 @@
 from graphrag.llm.llm import generate_response
-from graphrag.query.graph_search import query_graph
+from graphrag.query.graph_search import local_query_graph
 
 from graphrag.database.base import get_db
 from graphrag.database.models import Chunk
@@ -12,7 +12,7 @@ async def aquery(
 ) -> Tuple[str | None, List[str], Dict[str, Dict[str, Any]], List[str]]:
     
     db = next(get_db())
-    nodes, keywords = await query_graph(query=query, top_k=top_k, order_range=order_range)
+    nodes, keywords = await local_query_graph(query=query, top_k=top_k, order_range=order_range)
     chunk_texts: List[str] = []
     for chunk_id in nodes:
         if len(chunk_texts) >= max_nodes:

@@ -8,7 +8,7 @@ from typing import Any, Dict, Tuple, List
 import networkx as nx
 
 
-async def query_graph(query: str, top_k: int, order_range: int) -> Tuple[Dict[str, Dict[str, Any]], List[str]]:
+async def local_query_graph(query: str, top_k: int, order_range: int) -> Tuple[Dict[str, Dict[str, Any]], List[str]]:
 
     graph: nx.Graph = await upsert_data_and_create_graph(entities=[], 
                                                          relationships=[], 

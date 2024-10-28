@@ -492,6 +492,7 @@ config = GlobalConfig(
     max_chunk_size=800
 )
 
+plain_text = "YOUR TEXT to create the graph from" 
 graph = await insert(text=plain_text, config=config)
 query = "YOUR QUERY"
 

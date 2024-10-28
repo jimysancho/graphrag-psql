@@ -463,7 +463,7 @@ class GlobalConfig(BaseModel):
     
 ```
 
-### Example
+### 4.2 Example
 
 ```python
 from graphrag import (

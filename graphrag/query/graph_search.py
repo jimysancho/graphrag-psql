@@ -120,7 +120,7 @@ async def global_query_graph(query: str, top_k: int, alpha: float, edge_nodes: i
         for edge in edge_models
     ]
     
-    edges = sorted(edges, key=lambda x: x['degree'])
+    edges = sorted(edges, key=lambda x: x['degree'])[:2 * edge_nodes]
 
     chunk_to_edges: Dict[str, Set[Tuple[str, str]]] = {}
     chunk_ids = []

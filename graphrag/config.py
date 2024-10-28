@@ -1,12 +1,12 @@
 from pydantic import BaseModel, Field, field_validator, ValidationError
-from typing import Dict
+from typing import Dict, Optional
 
 
 class GlobalConfig(BaseModel):
 
     max_gleaning: int = Field(default=1, description="Number of times entities and relationships will be extracted from the same chunk")
     batch: int = Field(default=15, description="Extract entities from chunk in 'batch' batches")
-    entity_types: Dict[str, str] = Field(..., description="keys: entity types themselves, values: description of entity types")
+    entity_types: Optional[Dict[str, str]] = Field(default=None, description="keys: entity types themselves, values: description of entity types")
     min_chunk_size: int = Field(default=120, description="Min chunk size to create the chunks via semantic chunking")
     max_chunk_size: int = Field(default=150, description="Max chunk size to create the chunks via semantic chunking")
     keywords_top_k: int = Field(default=60, description="Number of entities to retrieve via similarity search over keyword vector database")
